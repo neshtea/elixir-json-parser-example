@@ -77,7 +77,7 @@ defmodule FP.Parser do
 
   defp parse_number_complete(iolist, true) do
     IO.iodata_to_binary(iolist) |> String.to_float
-  end 
+  end
 
   defp parse_digits(<<char>> <> rest = string) when char in '0123456789' do
     count = count_digits(rest, 1)
@@ -92,35 +92,22 @@ defmodule FP.Parser do
   defp count_digits(_, acc), do: acc
 
   # Object helper
-  def parse_object("}" <> rest, []), do: {Map.new(), rest}
-  def parse_object("\"" <> rest, acc) do
-    {name, rest} = parse_string(rest)
-
-    {value, rest} = case skip_white(rest) do
-                      ":" <> rest -> skip_white(rest) |> parse()
-                      _ -> raise "Not a valid object."
-                    end
+  defp parse_object("}" <> rest, acc), do: {Map.new(acc), rest}
+  defp parse_object("," <> rest, acc), do: skip_white(rest) |> parse_object(acc)
+  defp parse_object("\"" <> rest, acc) do
+    {name, rest} = parse_string(rest)  # Parse the name (key)
+    ":" <> rest = skip_white(rest)
+    {value, rest} = skip_white(rest) |> parse()  # Parse the value
     acc = [{name, value} | acc]
-
-    case skip_white(rest) do
-      "," <> rest -> skip_white(rest) |> parse_object(acc)
-      "}" <> rest -> {Map.new(acc), rest}
-      _ -> raise "Not a valid object."
-    end
+    parse_object(rest, acc)
   end
 
   # Array helper
-  defp parse_array("]" <> rest, _), do: {[], rest}
-
+  defp parse_array("]" <> rest, acc), do: {Enum.reverse(acc), rest}
+  defp parse_array("," <> rest, acc), do: parse_array(rest, acc)
   defp parse_array(string, acc) do
-    {value, rest} = parse(string)
-
-    acc = [value | acc]
-    case skip_white(rest) do
-      "," <> rest -> skip_white(rest) |> parse_array(acc)
-      "]" <> rest -> {:lists.reverse(acc), rest}
-      _ -> raise "Not a valid array."
-    end
+    {value, rest} = skip_white(string) |> parse()
+    skip_white(rest) |> parse_array([value | acc])
   end
 
   ## String helper
